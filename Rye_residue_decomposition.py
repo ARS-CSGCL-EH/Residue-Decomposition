@@ -244,6 +244,8 @@ def calculate_decomposition():
     cum_RM_N_Decomp = 0.0 #initialize
     cum_net_RM_N_Decomp = 0.0 #initialize
     new_theta_g = 0.0
+    N_im = 0.0
+    cum_N_im = 0.0 #cumulative N immobilized
 
     ########################################################
     # Determine residue water potential based on Dann (2021)
@@ -272,7 +274,7 @@ def calculate_decomposition():
     #create an empty pandas dataframe 
     column_names = ['datetime', 'rain','temp','RH', 'CARB_mass', 'CELL_mass', 'LIGN_mass', 'CARB_N_mass', 'CELL_N_mass', 'LIGN_N_mass', 
                     'N_mineralized', 'CUMN_mineralized','N_immobilized','soil_inorgN','RM_T', 'RM_N', 'kCARB', 'kCELL', 'kLIGN', 'MTRF', 
-                    'CNRF', 'ContactFactor', 'micro_N_demand', 'GrossN_minerlized']
+                    'CNRF', 'ContactFactor', 'micro_N_demand', 'GrossN_minerlized', 'cum_N_credit']
     df_out = pd.DataFrame(columns=column_names)
 
 
@@ -389,6 +391,7 @@ def calculate_decomposition():
         temp = RM_T_Decomp * Microbial_N_dmd - RM_N_Decomp
         if temp > 0: #icrobial N demand during residue decomposition is NOT met => take N from soil (i.e., immobilization) and add to CARB_N pool
             N_im = min([RM_T_Decomp * Microbial_N_dmd - RM_N_Decomp, soil_N])      #Microbial_N_dmd = 0.0213 
+            cum_N_im = cum_N_im + N_im
             soil_N = max([soil_N - temp, 0])  #soil_N should not be netagive
             CARB_N_mass = CARB_N_mass + temp
             net_RM_N_Decomp = 0.0
@@ -421,6 +424,7 @@ def calculate_decomposition():
         RM_N = LIGN_N_mass + CELL_N_mass + CARB_N_mass  #total remaining N mass in residue
         # cum_RM_N_Decomp = cum_RM_N_Decomp + RM_N_Decomp  #cumulative N mineralized from surface residue
         cum_net_RM_N_Decomp = cum_net_RM_N_Decomp + net_RM_N_Decomp  #cumulative N mineralized from surface residue
+        cum_N_credit = cum_net_RM_N_Decomp - cum_N_im
 
         #update soil inorgnaic N pool
         # soil_N = soil_N + net_RM_N_Decomp  #=> this is accumulating too much soil N
@@ -433,7 +437,7 @@ def calculate_decomposition():
         #=================update output df
         df_out.loc[len(df_out)] = [current_date, current_rain, current_T, current_RH,CARB_mass, CELL_mass, LIGN_mass,
                                     CARB_N_mass, CELL_N_mass, LIGN_N_mass, net_RM_N_Decomp, cum_net_RM_N_Decomp, N_im, soil_N,
-                                   RM_T, RM_N, k_CARB, k_CELL, k_LIGN, MTRF, CNRF,ContactFactor, RM_T_Decomp * Microbial_N_dmd, RM_N_Decomp] 
+                                   RM_T, RM_N, k_CARB, k_CELL, k_LIGN, MTRF, CNRF,ContactFactor, RM_T_Decomp * Microbial_N_dmd, RM_N_Decomp, cum_N_credit] 
         # column_names = ['datetime', 'rain','temp','RH', 'CARB_mass', 'CELL_mass', 'LIGN_mass', 'CARB_N_mass', 'CELL_N_mass', 'LIGN_N_mass', 
         #             'N_mineralized', 'CUMN_mineralized','N_immobilized','soil_inorgN','RM_T', 'RM_N', 'kCARB', 'kCELL', 'kLIGN', 'MTRF', 'CNRF', 'ContactFactor']
     
@@ -460,10 +464,10 @@ if __name__ == "__main__":
     mulch_mass_init = 5000 # kg/ha -> 150-10000 in Fig 4 Thampa (2022), 12000Table 2 in Wang (2021)
     residue_Theta_g = 1  # initial residue gravimetric water content [g H2O/g dry matter]  => See Fig. 4 and eqn (7) in Dann (2021) and 
     Frac_CARB_Init = 0.2  #see the resonable range (24-65%) in Table 1 in Thapa (2022)
-    Frac_CELL_Init = 0.6  #see the resonable range (31-68%) in Table 1 in Thapa (2022)
-    Frac_LIGN_Init = 0.07 #0.1  #see the resonable range (1-8%) in Table 1 in Thapa (2022)
+    Frac_CELL_Init = 0.7  #see the resonable range (31-68%) in Table 1 in Thapa (2022)
+    Frac_LIGN_Init = 0.1 #0.1  #see the resonable range (1-8%) in Table 1 in Thapa (2022)
     Frac_CARB_Init = 1 - Frac_CELL_Init - Frac_LIGN_Init
-    FracN_CARB_Init = 0.08  #0.01
+    FracN_CARB_Init = 0.03  #<<<<<<<======0.01(poor quality)  0.08 (too much N mineralized)
     FracN_CELL_Init = 0.01
     FracN_LIGN_Init = 0.01
     K_CARB_coeff = 0.018 #[h^(-1)] from Table 2 in Thapa(2022)   #Equn (2) in Thapa (2022) (0.43 [day^[-1] in Table 2 in Wang (2021)
