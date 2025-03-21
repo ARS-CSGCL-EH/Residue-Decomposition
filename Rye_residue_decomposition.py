@@ -214,7 +214,7 @@ def calculate_decomposition():
     Returns:
         None: Updates global variables with decomposition results.
     """  
-    global mulch_mass_init, N_inorg_init
+    global mulch_mass_init, soil_N
     global Frac_CARB_Init, Frac_CELL_Init, Frac_LIGN_Init, FracN_CARB_Init, FracN_CELL_Init, FracN_LIGN_Init
     global K_CARB_coeff, K_CELL_coeff, K_LIGN_coeff, base_T
     global a_rain, b_rain, c_rain, d_rain, param_a, param_b, param_k2_c
@@ -264,7 +264,7 @@ def calculate_decomposition():
     # Filter weather for the target period
     df = df[(df['date'] >= Init_date) & (df['date'] <= End_date)]
     df = df.reset_index()
-    print(df)
+    # print(df)
 
     current_date = Init_date 
     current_hour = current_date.hour
@@ -277,7 +277,7 @@ def calculate_decomposition():
 
 
     while current_date <= End_date:  #houlry loop
-        print(f"current date= ' {current_date}")
+        # print(f"current date= ' {current_date}")
         #1)compute updated residue water content depending on rain
         current_rain = df[(df['datetime'] == current_date) & (df['Hour'] == current_hour)].rain.values[0] #check
         current_T = df[(df['datetime'] == current_date) & (df['Hour'] == current_hour)].temperature.values[0] #check
@@ -354,7 +354,7 @@ def calculate_decomposition():
         else:
             MTRF = 0.0
     
-        CNR = PC_mulch * RM_T/(CARB_N_mass + CELL_N_mass + LIGN_N_mass + N_inorg_init) #check should be 
+        CNR = PC_mulch * RM_T/(CARB_N_mass + CELL_N_mass + LIGN_N_mass + soil_N) #check should be 
         if CNR > CNR_crit:  #CNR_crit =13
             CNRF = np.exp(a_CNRF*(CNR - CNR_crit)/CNR_crit)
         else:
@@ -383,12 +383,13 @@ def calculate_decomposition():
         #convert the gross decomposition to net decomposition        
         #==========Nitrogen immobilization similar to CERES-N but set to occur when microbial N demand during residue decomposition
         #                   is not fulfilled from gross N mineralized
-        N_im = min([RM_T_Decomp * Microbial_N_dmd - RM_N_Decomp, N_inorg_init])      #Microbial_N_dmd = 0.0213 
+        # N_im = min([RM_T_Decomp * Microbial_N_dmd - RM_N_Decomp, soil_N])      #Microbial_N_dmd = 0.0213 
         # N_im = max([N_im, 0.0])      ###???      RM_T_Decomp * Microbial_N_dmd - RM_N_Decomp can be negative....
         #update soil N if N immobilization occurs
         temp = RM_T_Decomp * Microbial_N_dmd - RM_N_Decomp
         if temp > 0: #icrobial N demand during residue decomposition is NOT met => take N from soil (i.e., immobilization) and add to CARB_N pool
-            N_inorg_init = N_inorg_init - temp
+            N_im = min([RM_T_Decomp * Microbial_N_dmd - RM_N_Decomp, soil_N])      #Microbial_N_dmd = 0.0213 
+            soil_N = max([soil_N - temp, 0])  #soil_N should not be netagive
             CARB_N_mass = CARB_N_mass + temp
             net_RM_N_Decomp = 0.0
             #============ update variables for a next time step (hour)  
@@ -400,8 +401,11 @@ def calculate_decomposition():
             CELL_N_mass = CELL_N_mass - CELL_Decomp_N
             LIGN_N_mass = LIGN_N_mass - LIGN_Decomp_N
         else:  #enough N is mineralized from residue to meet microbial N demand and humification
-            net_RM_N_Decomp = RM_N_Decomp* (1-HUMF) - N_im  #Net N mineralized from surface residue            
+            # net_RM_N_Decomp = RM_N_Decomp* (1-HUMF) - N_im  #Net N mineralized from surface residue        
+            net_RM_N_Decomp = RM_N_Decomp* (1-HUMF)   #  enough N is mineralized from residue to meet microbial N demand => thus NO imomobilization
             N_Humi = RM_N_Decomp * HUMF #12.5% of gross N mineralized from surface residue is synthesized back into soil OM 
+            #update soil inorgnaic mineral N pool
+            soil_N = soil_N + net_RM_N_Decomp
 
             #============ update variables for a next time step (hour)  
             CARB_mass = CARB_mass - CARB_Decomp
@@ -419,8 +423,7 @@ def calculate_decomposition():
         cum_net_RM_N_Decomp = cum_net_RM_N_Decomp + net_RM_N_Decomp  #cumulative N mineralized from surface residue
 
         #update soil inorgnaic N pool
-        # N_inorg_init = N_inorg_init + net_RM_N_Decomp  #=> this is accumulating too much soil N
-        N_inorg_init = N_inorg_init + net_RM_N_Decomp*0.1  #=> this is accumulating too much soil N
+        # soil_N = soil_N + net_RM_N_Decomp  #=> this is accumulating too much soil N
 
 
         # # Ensure that the loop does not run past the end_time
@@ -429,7 +432,7 @@ def calculate_decomposition():
 
         #=================update output df
         df_out.loc[len(df_out)] = [current_date, current_rain, current_T, current_RH,CARB_mass, CELL_mass, LIGN_mass,
-                                    CARB_N_mass, CELL_N_mass, LIGN_N_mass, net_RM_N_Decomp, cum_net_RM_N_Decomp, N_im, N_inorg_init,
+                                    CARB_N_mass, CELL_N_mass, LIGN_N_mass, net_RM_N_Decomp, cum_net_RM_N_Decomp, N_im, soil_N,
                                    RM_T, RM_N, k_CARB, k_CELL, k_LIGN, MTRF, CNRF,ContactFactor, RM_T_Decomp * Microbial_N_dmd, RM_N_Decomp] 
         # column_names = ['datetime', 'rain','temp','RH', 'CARB_mass', 'CELL_mass', 'LIGN_mass', 'CARB_N_mass', 'CELL_N_mass', 'LIGN_N_mass', 
         #             'N_mineralized', 'CUMN_mineralized','N_immobilized','soil_inorgN','RM_T', 'RM_N', 'kCARB', 'kCELL', 'kLIGN', 'MTRF', 'CNRF', 'ContactFactor']
@@ -437,7 +440,7 @@ def calculate_decomposition():
 
         current_date = current_date + timedelta(hours=1)  #check
         current_hour = current_date.hour
-        print(current_hour)
+        # print(current_hour)
         residue_Theta_g = new_theta_g
         old_RH = current_RH
     
@@ -456,10 +459,11 @@ if __name__ == "__main__":
     #====3/17/2025: input parameters for fresh rye residue => need to be changed appropriately for corn/soybean stover/residue decomposition
     mulch_mass_init = 5000 # kg/ha -> 150-10000 in Fig 4 Thampa (2022), 12000Table 2 in Wang (2021)
     residue_Theta_g = 1  # initial residue gravimetric water content [g H2O/g dry matter]  => See Fig. 4 and eqn (7) in Dann (2021) and 
-    Frac_CARB_Init = 0.2  #see the resonable range in Table 1 in Thapa (2022)
-    Frac_CELL_Init = 0.7  #see the resonable range in Table 1 in Thapa (2022)
-    Frac_LIGN_Init = 0.1   #see the resonable range in Table 1 in Thapa (2022)
-    FracN_CARB_Init = 0.01  #0.08
+    Frac_CARB_Init = 0.2  #see the resonable range (24-65%) in Table 1 in Thapa (2022)
+    Frac_CELL_Init = 0.6  #see the resonable range (31-68%) in Table 1 in Thapa (2022)
+    Frac_LIGN_Init = 0.07 #0.1  #see the resonable range (1-8%) in Table 1 in Thapa (2022)
+    Frac_CARB_Init = 1 - Frac_CELL_Init - Frac_LIGN_Init
+    FracN_CARB_Init = 0.08  #0.01
     FracN_CELL_Init = 0.01
     FracN_LIGN_Init = 0.01
     K_CARB_coeff = 0.018 #[h^(-1)] from Table 2 in Thapa(2022)   #Equn (2) in Thapa (2022) (0.43 [day^[-1] in Table 2 in Wang (2021)
@@ -495,8 +499,10 @@ if __name__ == "__main__":
     RM_max = 3000  #optimal residue mass above which decompostion is no longer impacted(RM_max [kg/ha]),  from Table 2 in Thapa(2022)
 
     # CNR represents the overal CN ratio in the contacting portion rather than the CN ratio of individual residue pools
-    # CNR = 0.41 *RM_total/(RM_N + N_inorg_init), where  
-    N_inorg_init = 5 #kg N/ha **** check => arbitrary number (note: 15ppm N in 5 cm soil=> 9 kg N/ha )
+    # CNR = 0.41 *RM_total/(RM_N + soil_N), where soil_N is the soil inorganic N pool in the surface soil layer
+            #*note: IDEAL HI = Soil content would be 60-100  kg N / ha in the upper 30 – 50 cm
+            #              LO = Soil content would be 20-30  kg N / ha in the upper 30 – 50 cm
+    soil_N = 5 #kg N/ha **** check => arbitrary number (note: 15ppm N in 5 cm soil=> 9 kg N/ha )
                      # in Table 1 Thapa (2022), Total N content (RN0) in residue are in range of 6-165 or 10-240 kg N/ha
 # c         PC_mulch        [g/g]   Mass concentration of C in mulch, g of C/g of solid portion of mulch, should be 0-1, from literature, e.g. in (https://www.pnas.org/content/115/16/4033), PC=0.4368
 # c         PN_mulch        [g/g]   Mass concentration of N in mulch, g of N/g of solid portion of mulch, should be 0-1, from literature, e.g. in (https://www.pnas.org/content/115/16/4033), PN=0.0140
