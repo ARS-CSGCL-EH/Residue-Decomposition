@@ -1,0 +1,42 @@
+*** Residue input parameters for model run ****
+[Hourly weather input file]
+ D:\ACSL_EJ\FSP_paper\Residue_decom_modeling\Python_model\FSPWeather_2005.csv
+[Output file]
+ D:\ACSL_EJ\FSP_paper\Residue_decom_modeling\Python_model\hourly_output2.csv
+[Simulation time period]
+Start_Date       End_Date ['MM/DD/YYYY']
+ 05/01/2005      10/03/2005
+[Rainfall effect on Residue gravimetric water content]
+********theta_g = a(1-exp(b*rain))+ c*(1-exp(d*rain))=> eqn(7) Fig(4)in Dann(2021)
+a            b             c                d
+ 0.8523    -0.9523        2.9558          -0.0583
+[Parameter to determin rate of residue drying [gH2O/g drymatter]
+********delta_residue_theta = k2, where k2 = c*T*residue_theta)=> eqn(5,6)in Dann(2021)
+c    
+ 0.01 
+[parameter to adjust residue decomposition by environment (residue water potential and temperature)
+********MTRF=(a+b*T)*exp(c+d*T^(-1))*psi=> eqn(3)in Thapa(2022)
+a            b             c                d
+ 0.384      0.018         0.142          0.628
+[parameter to adjust residue decomposition by C:N ratio
+********CNRF = exp(a*(CNR-13)/13) where CNR = PC_mulch*RM_t/(RM_t + N_inorg)=> eqn(3)in Thapa(2022) , PC_mulch=Mass concentration of C in mulch
+PC_mulch     a          
+ 0.426      -0.693 
+[Soil Properties]
+Initial soil N amount [kg/ha]  (note: 15ppm N in 5 cm soil=> 9 kg N/ha )
+ 5
+[Mulch_Mass_Properties]
+Initial residue mass amout [kg/ha]
+ 5000
+Initial residue gravimetric water content [g H2O/g dry matter]  => See Fig. 4 and eqn (7) in Dann (2021)
+ 1
+[Mulch_Decomposition]
+The Fraction of Three Carbon Formats (Initial Value)
+ Carbonhydrate(CARB)    Holo-Cellulose (CEL)   Lignin (LIG)
+ 0.2           0.7           0.1 
+The Fraction of N in Three Carbon Formats (Initial Value) => 0.0232 for all CARB, CELL and LIGN if you do not have additional data. That is the mean value for 99 site-years 
+ Carbonhydrate(CARB)    Holo-Cellulose (CEL)   Lignin (LIG)
+ 0.03          0.01          0.01 
+The Intrinsic Decomposition Speed of Three Carbon Formats (hour^-1)=> Table2 & Eqn(2) in Thapa (2022)
+ Carbonhydrate(CARB)    Holo-Cellulose (CEL)   Lignin (LIG)
+ 0.018        0.010           0.00095 

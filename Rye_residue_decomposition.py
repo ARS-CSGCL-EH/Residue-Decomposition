@@ -19,7 +19,6 @@ from scipy.optimize import fsolve
 # c     FLOAT TYPE  [UNIT]
 # c         PC_mulch        [g/g]   Mass concentration of C in mulch, g of C/g of solid portion of mulch, should be 0-1, from literature, e.g. in (https://www.pnas.org/content/115/16/4033), PC=0.4368
 # c         PN_mulch        [g/g]   Mass concentration of N in mulch, g of N/g of solid portion of mulch, should be 0-1, from literature, e.g. in (https://www.pnas.org/content/115/16/4033), PN=0.0140
-# c         alpha_F         [1]     The mulch feeding parameter, if the decomposition on soil-mulch interface is "a", then the decompositon for one layer above should be "alpha_mulch*a"
 # c         Frac_CARB       [1]     Fraction of Carbohydrate over Total Organic Mulch, should be 0-1, change during the simulation
 # c         Frac_CELL       [1]     Fraction of Holo-Cellulose over Total Organic Mulch, should be 0-1, change during the simulation
 # c         Frac_LIGN       [1]     Fraction of Lignin over Total Organic Mulch, should be 0-1, change during the simulation
@@ -32,23 +31,7 @@ from scipy.optimize import fsolve
 # c         Humid_Factor    [1]     Humification factor, 0.125D0
 # c         K_CARB          [day-1] Coef of decompositon rate, reference factor for CARB, need adjusted
 # c         K_CELL          [day-1] Coef of decompositon rate, reference factor for CELL, need adjusted
-# c         K_LIGN          [day-1] Coef of decompositon rate, reference factor for LIGN, need adjusted
-# c         K_CARB_temp     [day-1] Coef of decompositon rate for CARB, after adjusted
-# c         K_CELL_temp     [day-1] Coef of decompositon rate for CELL, after adjusted
-# c         K_LIGN_temp     [day-1] Coef of decompositon rate for LIGN, after adjusted
-# c         mulch_mass_temp [g]     All the availiable soild mulch in the target mulch element
-# c         N_mass_temp     [g]     All the availiable N in the target mulch element
-# c         INKG            [g]     Microbe-available inorganic N in shallow soil layer
-# c         CNR             [1] the universal C/R ratio for an given element 
-# c         Frac_Decomp(Layer)  [1] the decomposition fraction of each layer, 0 means no decomposition, 1 means totally gone
-# c         CO2mass_2_Cmass     [1] convert CO2 mass to C mass, 12/44
-# c         NO3mass_2_Nmass     [1] convert NO3 mass to N mass, 14/62  
-# c         NH4mass_2_Nmass     [1] convert NH4 mass to N mass, 14/18
-# c         ThetaV_2_ThetaM     [1] convert volumetric water content to gravimetric water content, there ThetaV is based on the whole mulch not based on mulch solid, so should be devided by (1-f_mulch_pore) first, then use mulch bulk density
-# c         HNew_m          [MPa]   Mulch water potential
-# c         Theta_m         [g/g]   Mulch gravimetric water content, refer to the total mulch
-# c         Temp_m          [oC]    Mulch temperature
-# c
+# c         K_LIGN          [day-1] Coef of decompositon rate, reference factor for LIGN, need adjuste
 # c ------------------------mass pools---------------------------------------------
 # c         CARB_mass       [g]     CARB mass of the mulch, CARB_mass+CELL_mass+LIGN_mass=mulch_mass_temp
 # c         CELL_mass       [g]     CELL mass of the mulch, CARB_mass+CELL_mass+LIGN_mass=mulch_mass_temp
@@ -56,129 +39,7 @@ from scipy.optimize import fsolve
 # c         CARB_N_mass     [g]     N within CARB, CARB_N_mass+CELL_N_mass+LIGN_N_mass=N_mass_temp
 # c         CELL_N_mass     [g]     N within CELL, CARB_N_mass+CELL_N_mass+LIGN_N_mass=N_mass_temp
 # c         LIGN_N_mass     [g]     N within LIGN, CARB_N_mass+CELL_N_mass+LIGN_N_mass=N_mass_temp
-# c
-# c ------------------------decomposition rate---------------------------------------------
-# c         CNRF            [0-1]   CNR effects on decomposition
-# c         MTRF            [0-1]   Moisture and Temperature effects on decomposition
-# c         N_im            [g/day] the immobilization of N before N reach the soil surface (N interception by mulch)
-# c         CARB_Decomp     [g/day] Decomposition speed for CARB, after add CNRF and MTRF
-# c         CELL_Decomp     [g/day] Decomposition speed for CELL, after add CNRF and MTRF
-# c         LIGN_Decomp     [g/day] Decomposition speed for LIGN, after add CNRF and MTRF
-# c         FOM_Decomp      [g/day] Decomposition speed for all the organic matter (mulch residue)
-# c         CARB_Decomp_N   [g/day] Gross Decomposition speed for N in CARB, after add CNRF and MTRF
-# c         CELL_Decomp_N   [g/day] Gross Decomposition speed for N in CELL, after add CNRF and MTRF
-# c         LIGN_Decomp_N   [g/day] Gross Decomposition speed for N in LIGN, after add CNRF and MTRF
-# c         FOMN_Decomp     [g/day] Gross/Actual Decomposition speed for N in organic matter (mulch residue N)
-# c         CARB_total_decomp_R   [g] Total residue decomposition of CARB for mulch-soil interface
-# c         CELL_total_decomp_R   [g] Total residue decomposition of CELL for mulch-soil interface
-# c         LIGN_total_decomp_R   [g] Total residue decomposition of LIGN for mulch-soil interface
-# c         CARB_total_decomp_N   [g] Total gross N mineralization of CARB for mulch-soil interface  
-# c         CELL_total_decomp_N   [g] Total gross N mineralization of CELL for mulch-soil interface 
-# c         LIGN_total_decomp_N   [g] Total gross N mineralization of LIGN for mulch-soil interface
-# c         Nim_total_decomp      [g] Total N mulch-interception
-# c         Nmine_total_decomp    [g] Total N mineralization, >0 mulch to soil; <0 soil to mulch
-# c         Nhumi_total_decomp    [g] Total N humification, >0 mulch to soil
-# c         Mulch_Decompose [g]     Total decomposition on mulch-soil interface based on MULCH (NOT C-BASED HERE)      
-# c         Mulch_Avail     [g]     Total availiable mulch for the current layer (horizontal level)
-# c         Mulch_AvailUp   [g]     Total availiable mulch for the current layer (horizontal level) when considering a two layered structure
-# c         Mulch_AvailDown [g]     Total availiable mulch for the lower layer (horizontal level) when considering a two layered structure
-# c         totalMulchWidth [cm]    the whole mulch width
-# c         CO2_to_Air      [nu g CO2/cm^3] the concentration of CO2 added to air based on mulch decomposition and mulch volume.
 
-
-# ----------------------- Initialization Functions -------------------------
-
-# def read_mulch_input(mulch_file):
-#     """
-#     Reads mulch decomposition parameters from a file.
-
-#     Args:
-#         mulch_file (str): The path to the mulch input file.
-
-#     Returns:
-#         None: Initializes global variables.
-#     """
-#     try:
-#         with open(mulch_file, 'r') as f:
-#             for _ in range(3):
-#                 in_string_mulch = f.readline().strip()
-#                 if _ == 0 and in_string_mulch[0:23] != '[Mulch_Decomposition]':
-#                     continue
-
-#             global Crit_Level, alpha_F
-#             Crit_Level, alpha_F = map(float, f.readline().split())
-#             for _ in range(3):
-#                 f.readline()
-
-#             global Frac_CARB_Init, Frac_CELL_Init, Frac_LIGN_Init
-#             Frac_CARB_Init, Frac_CELL_Init, Frac_LIGN_Init = map(float, f.readline().split())
-#             for _ in range(3):
-#                 f.readline()
-
-#             global FracN_CARB_Init, FracN_CELL_Init, FracN_LIGN_Init
-#             FracN_CARB_Init, FracN_CELL_Init, FracN_LIGN_Init = map(float, f.readline().split())
-#             for _ in range(3):
-#                 f.readline()
-
-#             global K_CARB, K_CELL, K_LIGN
-#             K_CARB, K_CELL, K_LIGN = map(float, f.readline().split())
-
-#     except FileNotFoundError:
-#         print('Mulch Information is not Included')
-#         return
-
-# def initialize_mulch_data():
-#     """
-#     Initializes mulch data structures and sets up critical levels.
-#     This corresponds to the Fortran code under `IF(MulchDecompIni.eq.1 ...`.
-
-#     Args:
-#         None: Uses global variables.
-
-#     Returns:
-#         None: Initializes mulch-related data structures (e.g., arrays).
-#     """
-
-#     global LocalFlag_MulchDecomp_Start, LocalFlag_MulchDecomp_FinalAssign, Crit_Level
-#     LocalFlag_MulchDecomp_Start = 1
-#     LocalFlag_MulchDecomp_FinalAssign = 0
-
-#     Crit_Level = Crit_Level * mulchThick  #  mulchThick needs to be defined
-
-#     global Frac_CARB, Frac_CELL, Frac_LIGN, ThetaV_2_ThetaM
-#     Frac_CARB = Frac_CARB_Init
-#     Frac_CELL = Frac_CELL_Init
-#     Frac_LIGN = Frac_LIGN_Init
-
-#     ThetaV_2_ThetaM = 1.0 / (rho_mulch_b / rho_w)  # rho_mulch_b, rho_w  need to be defined
-
-#     global CARB_mass, CELL_mass, LIGN_mass, CARB_N_mass, CELL_N_mass, LIGN_N_mass
-#     # Initialize mass pools (NumPy arrays)
-#     CARB_mass = np.zeros((mulchLayer, SurNodeIndex_M - 1))  # mulchLayer, SurNodeIndex_M need to be defined
-#     CELL_mass = np.zeros((mulchLayer, SurNodeIndex_M - 1))
-#     LIGN_mass = np.zeros((mulchLayer, SurNodeIndex_M - 1))
-#     CARB_N_mass = np.zeros((mulchLayer, SurNodeIndex_M - 1))
-#     CELL_N_mass = np.zeros((mulchLayer, SurNodeIndex_M - 1))
-#     LIGN_N_mass = np.zeros((mulchLayer, SurNodeIndex_M - 1))
-
-#     for kk in range(SurNodeIndex_M - 1):
-#         for jj in range(mulchLayer):
-#             EleIndex = MulchEleMatrix[jj, kk]  # MulchEleMatrix needs to be defined
-#             mulch_mass_temp = MulchEleMarkerArea[EleIndex] * rho_mulch_b * 1.0e-6  # MulchEleMarkerArea needs to be defined
-#             aaaa = mulch_mass_temp * Frac_CARB_Init
-#             CARB_mass[jj, kk] = aaaa
-#             CARB_N_mass[jj, kk] = aaaa * FracN_CARB_Init
-#             aaaa = mulch_mass_temp * Frac_CELL_Init
-#             CELL_mass[jj, kk] = aaaa
-#             CELL_N_mass[jj, kk] = aaaa * FracN_CELL_Init
-#             aaaa = mulch_mass_temp * Frac_LIGN_Init
-#             LIGN_mass[jj, kk] = aaaa
-#             LIGN_N_mass[jj, kk] = aaaa * FracN_LIGN_Init
-
-#     global Nim_cumu_decomp, Nmine_cumu_decomp, Nhumi_cumu_decomp
-#     Nim_cumu_decomp = 0.0
-#     Nmine_cumu_decomp = 0.0
-#     Nhumi_cumu_decomp = 0.0
 
 # # ----------------------- Calculation Functions -------------------------
 #EJ: to estimate rain amount equivalent to the inital residue gravemetric water content (theta_g) at the onset of rain event
@@ -246,6 +107,10 @@ def calculate_decomposition():
     new_theta_g = 0.0
     N_im = 0.0
     cum_N_im = 0.0 #cumulative N immobilized
+    cum_N_Humi = 0.0 #cumulative humified N (quantity of the instantaneous N humification during mulch decomposition)
+    totalMulchC_final = 0.0
+    # totalMulchN_final = 0.0
+    N_Humi = 0.0
 
     ########################################################
     # Determine residue water potential based on Dann (2021)
@@ -274,7 +139,7 @@ def calculate_decomposition():
     #create an empty pandas dataframe 
     column_names = ['datetime', 'rain','temp','RH', 'CARB_mass', 'CELL_mass', 'LIGN_mass', 'CARB_N_mass', 'CELL_N_mass', 'LIGN_N_mass', 
                     'N_mineralized', 'CUMN_mineralized','N_immobilized','soil_inorgN','RM_T', 'RM_N', 'kCARB', 'kCELL', 'kLIGN', 'MTRF', 
-                    'CNRF', 'ContactFactor', 'micro_N_demand', 'GrossN_minerlized', 'cum_N_credit']
+                    'CNRF', 'ContactFactor', 'micro_N_demand', 'GrossN_minerlized', 'cum_N_credit', 'cum_N_Humi', 'MulchC_final']
     df_out = pd.DataFrame(columns=column_names)
 
 
@@ -425,6 +290,7 @@ def calculate_decomposition():
         # cum_RM_N_Decomp = cum_RM_N_Decomp + RM_N_Decomp  #cumulative N mineralized from surface residue
         cum_net_RM_N_Decomp = cum_net_RM_N_Decomp + net_RM_N_Decomp  #cumulative N mineralized from surface residue
         cum_N_credit = cum_net_RM_N_Decomp - cum_N_im
+        cum_N_Humi = cum_N_Humi + N_Humi
 
         #update soil inorgnaic N pool
         # soil_N = soil_N + net_RM_N_Decomp  #=> this is accumulating too much soil N
@@ -434,10 +300,21 @@ def calculate_decomposition():
         # if current_date >= End_date:
         #     break
 
+
+        #===============================================================================
+        #  c ---------------------------- the final assignment of mulch C and mulch N to soil-----------------------------------------------       
+        #  c    by the end of mulch decomposition (this is the last step when the mulch model is kicked out).
+        #  c        totalMulchC_final   [g]     total amount of C in the mulch, based on resham's data should be PC_mulch~0.4-0.43
+        #  c                                    first record the whole mulch mass, then times PC 
+        #  c        totalMulchN_final   [g]     total amount of N in the mulch      
+        totalMulchC_final = (CARB_N_mass + CELL_N_mass + LIGN_N_mass)*PC_mulch
+        # totalMulchN_final = CARB_N_mass + CELL_N_mass + LIGN_N_mass #=> same as RM_N
+
+
         #=================update output df
         df_out.loc[len(df_out)] = [current_date, current_rain, current_T, current_RH,CARB_mass, CELL_mass, LIGN_mass,
                                     CARB_N_mass, CELL_N_mass, LIGN_N_mass, net_RM_N_Decomp, cum_net_RM_N_Decomp, N_im, soil_N,
-                                   RM_T, RM_N, k_CARB, k_CELL, k_LIGN, MTRF, CNRF,ContactFactor, RM_T_Decomp * Microbial_N_dmd, RM_N_Decomp, cum_N_credit] 
+                                   RM_T, RM_N, k_CARB, k_CELL, k_LIGN, MTRF, CNRF,ContactFactor, RM_T_Decomp * Microbial_N_dmd, RM_N_Decomp, cum_N_credit, cum_N_Humi, totalMulchC_final] 
         # column_names = ['datetime', 'rain','temp','RH', 'CARB_mass', 'CELL_mass', 'LIGN_mass', 'CARB_N_mass', 'CELL_N_mass', 'LIGN_N_mass', 
         #             'N_mineralized', 'CUMN_mineralized','N_immobilized','soil_inorgN','RM_T', 'RM_N', 'kCARB', 'kCELL', 'kLIGN', 'MTRF', 'CNRF', 'ContactFactor']
     
@@ -447,7 +324,8 @@ def calculate_decomposition():
         # print(current_hour)
         residue_Theta_g = new_theta_g
         old_RH = current_RH
-    
+        #=======================END of HOURLY LOOP   
+
     #write output df into csv                                                                                                       
     df_out.to_csv(out_fname, index=False)
     #====================end
